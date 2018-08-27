@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-
+basepath=$(cd `dirname $0`; pwd)
 source environment.sh
 
 UNI_BUILD_ROOT=`pwd`
@@ -13,6 +13,12 @@ FF_ACT_ARCHS_64="armv5 armv7a arm64 x86 x86_64"
 FF_ACT_ARCHS_ALL=$FF_ACT_ARCHS_64
 
 
+#absolute path
+export SOURCE_FFMPEG="/Users/xunxun/source/ndk/ffmpeg/ffmpeg"
+export SOURCE_X264=
+export SOURCE_FDK_AAC=
+
+export COM_OUTPUT_FOLD="build"
 
 echo_archs() {
     echo "===================="
@@ -33,24 +39,47 @@ echo_usage() {
     exit 1
 }
 
+startCompile() {
+    cd $basepath
+    archparam=$1
+    source toolchain.sh $archparam
+    cd $SOURCE_FFMPEG
+    source ${basepath}/ffmpeg_common_param.sh $archparam
+    sh ${basepath}/compile_ffmpeg.sh $archparam
+    
+    # cd $SOURCE_X264
+    # sh ${basepath}/compile_x264.sh $archparam
 
+    # cd $SOURCE_FDK_AAC
+    # sh ${basepath}/compile_fdk_aac.sh $archparam
+}
+
+check_var() {
+    if [ ! -d "$SOURCE_FFMPEG" ]; then
+        echo "error"
+        echo "please set var SOURCE_FFMPEG and SOURCE_X264 and SOURCE_FDK_AAC"
+        exit 1
+    fi
+}
+
+check_var
 case "$FF_TARGET" in
     armv5|armv7a|arm64|x86|x86_64)
         echo_archs $FF_TARGET 
-        source toolchain.sh $FF_TARGET
+        startCompile $FF_TARGET
     ;;
     all32)
         echo_archs $FF_ACT_ARCHS_32
         for ARCH in $FF_ACT_ARCHS_32
         do
-            source toolchain.sh $ARCH
+            startCompile $ARCH
         done
     ;;
     all|all64)
         echo_archs $FF_ACT_ARCHS_64
         for ARCH in $FF_ACT_ARCHS_64
         do
-            source toolchain.sh $ARCH
+            startCompile $ARCH
         done
     ;;
     clean)
@@ -68,106 +97,6 @@ esac
 
 exit 0
 
- build_one() {
-    ./configure \
---prefix=$PREFIX \
---arch=arm \
---cpu=armv7-a \
---target-os=android \
---enable-cross-compile \
---cross-prefix=$TOOLCHAIN/bin/arm-linux-androideabi- \
---sysroot=$PLATFORM \
---extra-cflags="-I$X264_INCLUDE -I$fdkaac_INCLUDE -I$PLATFORM/usr/include" \
---extra-ldflags="-L$X264_LIB -L$fdkaac_LIB" \
---cc=$TOOLCHAIN/bin/arm-linux-androideabi-gcc \
---nm=$TOOLCHAIN/bin/arm-linux-androideabi-nm \
---disable-shared \
---enable-static \
---enable-gpl \
---enable-version3 \
---enable-pthreads \
---enable-runtime-cpudetect \
---disable-small \
---enable-network \
---disable-vda \
---disable-iconv \
---enable-asm \
---enable-neon \
---enable-yasm \
---disable-encoders \
---enable-libx264 \
---enable-libfdk-aac \
---enable-encoder=libx264 \
---enable-encoder=aac \
---enable-encoder=mpeg4 \
---enable-encoder=mjpeg \
---enable-encoder=png \
---disable-muxers \
---enable-muxer=mov \
---enable-muxer=mp4 \
---enable-muxer=adts \
---enable-muxer=h264 \
---enable-muxer=mjpeg \
---disable-decoders \
---enable-decoder=aac \
---enable-decoder=aac_latm \
---enable-decoder=mp3 \
---enable-decoder=h264 \
---enable-decoder=mpeg4 \
---enable-decoder=mjpeg \
---enable-decoder=png \
---disable-demuxers \
---enable-demuxer=rtsp \
---enable-demuxer=image2 \
---enable-demuxer=h264 \
---enable-demuxer=aac \
---enable-demuxer=mp3 \
---enable-demuxer=mpc \
---enable-demuxer=mpegts \
---enable-demuxer=mov \
---disable-parsers \
---enable-parser=aac \
---enable-parser=ac3 \
---enable-parser=h264 \
---disable-protocols \
---enable-protocol=file \
---enable-protocol=concat \
---enable-protocol=tcp \
---enable-protocol=udp \
---enable-filters \
---enable-zlib \
---disable-outdevs \
---disable-doc \
---disable-ffplay \
---disable-ffmpeg \
---disable-ffserver \
---disable-debug \
---disable-ffprobe \
---enable-postproc \
---enable-avdevice \
---enable-avresample \
---enable-nonfree \
---disable-symver \
---disable-stripping \
---enable-jni \
---enable-mediacodec \
---enable-decoder=h264_mediacodec \
---enable-hwaccel=h264_mediacodec \
---enable-decoder=hevc_mediacodec \
---extra-cflags="-Os -fpic $ADDI_CFLAGS" \
---extra-ldflags="$ADDI_LDFLAGS" \
-$ADDITIONAL_CONFIGURE_FLAG
-
-
-echo "config finish"
-sleep 5
-    make clean
-    make -j8
-    make install
-
-
-
-}
 
 createSo(){
 	$TOOLCHAIN/bin/arm-linux-androideabi-ld \
@@ -206,14 +135,8 @@ fdkaac_INCLUDE=${fdkaac_lib}/include
 fdkaac_LIB=${fdkaac_lib}/lib
 
 # arm v7vfp
-CPU=arm-v7a
-OPTIMIZE_CFLAGS="-mfloat-abi=softfp -mfpu=vfp -marm -march=armv7-a "
-ADDI_CFLAGS="-marm"
-#本次编译产物位置
-PREFIX=/home/xunxun/dev/ffmpeg_build4android/android/$CPU
 
-#生成静态库
-build_one
+
 
 echo "build finish"
 sleep 5

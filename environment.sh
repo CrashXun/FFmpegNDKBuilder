@@ -5,8 +5,12 @@ UNAME_S=$(uname -s)
 UNAME_SM=$(uname -sm)
 echo "build on $UNAME_SM"
 
-FF_NDK=$ANDROID_NDK
+
 export FF_NDK="/home/xunxun/devtool/android-ndk-r15c"
+
+if [ -d "$ANDROID_NDK" ]; then
+    FF_NDK=$ANDROID_NDK
+fi
 
 if [ -z "$FF_NDK" ]; then
     echo "You must define ANDROID_NDK before starting."

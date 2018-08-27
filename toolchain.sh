@@ -25,6 +25,7 @@ ANDROID_VER_64=android-21
 export GCC_VER=4.9
 export GCC_64_VER=4.9
 export SYSROOT=
+export TOOLCHAIN_FOLD=
 export CROSS_PREFIX=
 export TOOLCHAIN=
 export ANDROID_PLATFORM=
@@ -38,43 +39,40 @@ export CFLAG_SYSROOT=
 
 armv5() {
     CROSS_PREFIX=arm-linux-androideabi
+    TOOLCHAIN_FOLD=$CROSS_PREFIX
     ANDROID_PLATFORM=$ANDROID_VER_32
     SYSROOT=$FF_NDK/platforms/$ANDROID_PLATFORM/arch-arm
 }
 
 armv7a() {
     CROSS_PREFIX=arm-linux-androideabi
+    TOOLCHAIN_FOLD=$CROSS_PREFIX
     ANDROID_PLATFORM=$ANDROID_VER_32
     SYSROOT=$FF_NDK/platforms/$ANDROID_PLATFORM/arch-arm
-
-    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS \
--march=armv7-a \
--mcpu=cortex-a8 \
--mfpu=vfpv3-d16 \
--mfloat-abi=softfp \
--mthumb"
-    FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -Wl,--fix-cortex-a8"
 }
 
 arm64() {
     CROSS_PREFIX=aarch64-linux-android
+    TOOLCHAIN_FOLD=$CROSS_PREFIX
     ANDROID_PLATFORM=$ANDROID_VER_64
     SYSROOT=$FF_NDK/platforms/$ANDROID_PLATFORM/arch-arm64
 }
 
 x86(){
     CROSS_PREFIX=i686-linux-android
+    TOOLCHAIN_FOLD=x86
     ANDROID_PLATFORM=$ANDROID_VER_32
     SYSROOT=$FF_NDK/platforms/$ANDROID_PLATFORM/arch-x86
 }
 
 x86_64(){
     CROSS_PREFIX=x86_64-linux-android
+    TOOLCHAIN_FOLD=x86_64
     ANDROID_PLATFORM=$ANDROID_VER_64
     SYSROOT=$FF_NDK/platforms/$ANDROID_PLATFORM/arch-x86_64
 }
 
-set -x
+# set -x
 case "$ARCH" in
     armv5)
         armv5
@@ -102,12 +100,15 @@ case "$ARCH" in
     ;;
 esac
 
-TOOLCHAIN=$FF_NDK/toolchains/${CROSS_PREFIX}-${GCC_VER}/prebuilt/$TOOLCHAIN_SYSTEM
+set -x
+TOOLCHAIN=$FF_NDK/toolchains/${TOOLCHAIN_FOLD}-${GCC_VER}/prebuilt/$TOOLCHAIN_SYSTEM
 CFLAG_CROSS_PREFIX=$TOOLCHAIN/bin/${CROSS_PREFIX}-
 CFLAG_SYSROOT=$SYSROOT
+set +x
 
-#export CC="${FF_CROSS_PREFIX}-gcc"
-export LD=${CFLAG_CROSS_PREFIX}ld
+export NDK_CC="${CFLAG_CROSS_PREFIX}gcc"
+export NDK_LD="${CFLAG_CROSS_PREFIX}ld"
+export NDK_NM="${CFLAG_CROSS_PREFIX}nm"
 #export AR=${FF_CROSS_PREFIX}-ar
 #export STRIP=${FF_CROSS_PREFIX}-strip
 
