@@ -31,9 +31,10 @@ FF_MODULE_DIRS="compat libavcodec libavdevice libavresample libpostproc libavfil
 libavformat libavutil libswscale"
 
 OUTPUT_PATH=${SOURCE_FFMPEG}/${COM_OUTPUT_FOLD}/$ARCH
+set -x
 x264output=${SOURCE_X264}/${COM_OUTPUT_FOLD}/${ARCH}
 aacoutput=${SOURCE_FDK_AAC}/${COM_OUTPUT_FOLD}/${ARCH}
-
+set +x
 
 armv5() {
    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=arm --enable-asm --enable-inline-asm"
@@ -43,6 +44,7 @@ armv5() {
 }
 
 armv7a() {
+#cortex-a8
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=arm --cpu=cortex-a8 --enable-asm --enable-inline-asm" 
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-neon"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-thumb"
@@ -66,7 +68,7 @@ arm64() {
 }
 
 x86(){
-	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-x86asm --disable-asm"
+	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-yasm --disable-asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=atom -msse3 -ffast-math -mfpmath=sse"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -74,7 +76,7 @@ x86(){
 }
 
 x86_64(){
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-x86asm --enable-asm --enable-inline-asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-yasm --enable-asm --enable-inline-asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -87,8 +89,8 @@ _common(){
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-cross-compile"
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --cross-prefix=$CFLAG_CROSS_PREFIX"
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --sysroot=$CFLAG_SYSROOT"
-
-
+    #FF_CFG_FLAGS="$FF_CFG_FLAGS --pkg-config-flags=--static" 
+    #FF_CFG_FLAGS="$FF_CFG_FLAGS --bindir=$HOME/bin"
 
 	#FF_CFG_FLAGS="$FF_CFG_FLAGS --target-os=linux"
 	#这里指定android,否则使用--enable-jni将报错
@@ -110,19 +112,23 @@ _common(){
     FF_CFLAGS="$FF_CFLAGS -DANDROID -DNDEBUG"
 
     #x264
-    #FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libx264"
-    # FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${x264output}/include"
-	# FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -L${x264output}/lib"
-
+    set -x
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libx264"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${x264output}/include"
+	FF_DEP_LIBS="$FF_DEP_LIBS -L${x264output}/lib"
+    set +x
+    
     #aac
-    #FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libfdk-aac"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libfdk-aac"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-encoder=libfdk_aac"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-decoder=libfdk_aac"
 
-    # FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${aacoutput}/include"
-	# FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -L${aacoutput}/lib"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${aacoutput}/include"
+	FF_DEP_LIBS="$FF_DEP_LIBS -L${aacoutput}/lib"
 
     #ndk
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${CFLAG_SYSROOT}/usr/include"
-	# FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -L${CFLAG_SYSROOT}/usr/lib"
+    FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -L${CFLAG_SYSROOT}/usr/lib"
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -Os -fpic"
 # -marm
     #FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -lgcc"
@@ -146,7 +152,10 @@ _configure(){
         --nm=$NDK_NM \
         --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
         --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
-    
+
+    if [ "$?" = "1" ];then
+        exit 1
+    fi
 }
 
 _make(){
@@ -171,6 +180,11 @@ _make(){
     	sleep 2
     	rm -rf ${OUTPUT_PATH}
     fi
+
+    if [ "$?" = "1" ];then
+        exit 1
+    fi
+
     make install
     mkdir -p ${OUTPUT_PATH}/include/libffmpeg
 	cp -f config.h ${OUTPUT_PATH}/include/libffmpeg/config.h
@@ -232,12 +246,21 @@ _link(){
     done
 
     #set -x
-    $NDK_CC -lm -lz -shared --sysroot=$CFLAG_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack $FF_EXTRA_LDFLAGS \
+    $NDK_CC -lm -lz -shared --sysroot=$CFLAG_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack \
+        $FF_EXTRA_LDFLAGS \
         -Wl,-soname,libijkffmpeg.so \
         $FF_C_OBJ_FILES \
         $FF_ASM_OBJ_FILES \
+        -Wl,-Bstatic \
         $FF_DEP_LIBS \
+        -lx264 -lfdk-aac \
+        -Wl,-Bdynamic \
         -o $OUTPUT_PATH/libijkffmpeg.so
+
+    if [ "$?" = "1" ];then
+        exit 1
+    fi
+
 }
 
 
@@ -269,12 +292,13 @@ case "$ARCH" in
 esac
 
 _common
+sleep 2
 _configure
-
-#sleep 5
+sleep 2
 _make
+sleep 2
 _link
-
+sleep 2
 
 # --extra-ldflags="$ADDI_LDFLAGS" \
 # OPTIMIZE_CFLAGS="-mfloat-abi=softfp -mfpu=vfp -marm -march=armv7-a "

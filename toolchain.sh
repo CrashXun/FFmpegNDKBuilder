@@ -108,6 +108,7 @@ set +x
 
 #export NDK_CC="${CFLAG_CROSS_PREFIX}gcc"
 export NDK_CC="${CFLAG_CROSS_PREFIX}gcc"
+export NDK_CXX="${CFLAG_CROSS_PREFIX}g++"
 export NDK_LD=${CFLAG_CROSS_PREFIX}ld
 export NDK_AR=${CFLAG_CROSS_PREFIX}ar
 export NDK_NM=${CFLAG_CROSS_PREFIX}nm
