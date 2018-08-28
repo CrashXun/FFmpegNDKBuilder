@@ -19,7 +19,7 @@ elif [ -z "$FF_NDK" ]; then
     exit 1
 fi
 
-ANDROID_VER_32=android-14
+ANDROID_VER_32=android-9
 ANDROID_VER_64=android-21
 
 export GCC_VER=4.9
@@ -106,9 +106,11 @@ CFLAG_CROSS_PREFIX=$TOOLCHAIN/bin/${CROSS_PREFIX}-
 CFLAG_SYSROOT=$SYSROOT
 set +x
 
+#export NDK_CC="${CFLAG_CROSS_PREFIX}gcc"
 export NDK_CC="${CFLAG_CROSS_PREFIX}gcc"
-export NDK_LD="${CFLAG_CROSS_PREFIX}ld"
-export NDK_NM="${CFLAG_CROSS_PREFIX}nm"
+export NDK_LD=${CFLAG_CROSS_PREFIX}ld
+export NDK_AR=${CFLAG_CROSS_PREFIX}ar
+export NDK_NM=${CFLAG_CROSS_PREFIX}nm
 #export AR=${FF_CROSS_PREFIX}-ar
 #export STRIP=${FF_CROSS_PREFIX}-strip
 

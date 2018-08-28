@@ -3,7 +3,7 @@
 #--------------------
 # Standard options:
 export COMMON_FF_CFG_FLAGS=
-# export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --prefix=PREFIX"
+
 
 # Licensing options:
 export COMMON_FF_CFG_FLAGS="$COMMON_FF_CFG_FLAGS --enable-gpl"

@@ -26,6 +26,9 @@ FF_CFG_FLAGS=
 FF_CFLAGS=
 FF_EXTRA_CFLAGS=
 FF_EXTRA_LDFLAGS=
+FF_ASSEMBLER_SUB_DIRS=
+FF_MODULE_DIRS="compat libavcodec libavdevice libavresample libpostproc libavfilter libswresample \
+libavformat libavutil libswscale"
 
 OUTPUT_PATH=${SOURCE_FFMPEG}/${COM_OUTPUT_FOLD}/$ARCH
 x264output=${SOURCE_X264}/${COM_OUTPUT_FOLD}/${ARCH}
@@ -36,6 +39,7 @@ armv5() {
    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=arm --enable-asm --enable-inline-asm"
    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv5te -mtune=arm9tdmi -msoft-float"
    FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
+    FF_ASSEMBLER_SUB_DIRS="arm"
 }
 
 armv7a() {
@@ -50,6 +54,7 @@ armv7a() {
 -mfloat-abi=softfp \
 -mthumb"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -Wl,--fix-cortex-a8"
+    FF_ASSEMBLER_SUB_DIRS="arm"
 }
 
 arm64() {
@@ -57,28 +62,32 @@ arm64() {
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
+    FF_ASSEMBLER_SUB_DIRS="aarch64 neon"
 }
 
 x86(){
-	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-yasm --disable-asm"
+	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-x86asm --disable-asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=atom -msse3 -ffast-math -mfpmath=sse"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
+    FF_ASSEMBLER_SUB_DIRS="x86"
 }
 
 x86_64(){
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-yasm --enable-asm --enable-inline-asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-x86asm --enable-asm --enable-inline-asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
+    FF_ASSEMBLER_SUB_DIRS="x86"
 }
 
 _common(){
 		echo "===============_common()==============="
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --prefix=$OUTPUT_PATH"
+	FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-cross-compile"
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --cross-prefix=$CFLAG_CROSS_PREFIX"
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --sysroot=$CFLAG_SYSROOT"
-	FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-cross-compile"
+
 
 
 	#FF_CFG_FLAGS="$FF_CFG_FLAGS --target-os=linux"
@@ -93,12 +102,12 @@ _common(){
 
     FF_CFG_FLAGS="$FF_CFG_FLAGS $COMMON_FF_CFG_FLAGS"
 
-    FF_CFLAGS="-O3 -Wall -pipe \
-    -std=c99 \
-    -ffast-math \
-    -fstrict-aliasing -Werror=strict-aliasing \
-    -Wno-psabi -Wa,--noexecstack \
-    -DANDROID -DNDEBUG"
+    FF_CFLAGS="$FF_CFLAGS -O3 -Wall -pipe"
+    FF_CFLAGS="$FF_CFLAGS -std=c99"
+    FF_CFLAGS="$FF_CFLAGS -ffast-math"
+    FF_CFLAGS="$FF_CFLAGS -fstrict-aliasing -Werror=strict-aliasing"
+    FF_CFLAGS="$FF_CFLAGS -Wno-psabi -Wa,--noexecstack"
+    FF_CFLAGS="$FF_CFLAGS -DANDROID -DNDEBUG"
 
     #x264
     #FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libx264"
@@ -114,7 +123,9 @@ _common(){
     #ndk
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${CFLAG_SYSROOT}/usr/include"
 	# FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -L${CFLAG_SYSROOT}/usr/lib"
-    #FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -Os -fpic -marm"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -Os -fpic"
+# -marm
+    #FF_DEP_LIBS="$FF_EXTRA_LDFLAGS -lgcc"
 }
 
 
@@ -129,9 +140,10 @@ _configure(){
 	    exit 1
 	fi
 
+
 	./configure $FF_CFG_FLAGS \
-		--cc=$NDK_CC \
-		--nm=$NDK_LD \
+        --cc=$NDK_CC \
+        --nm=$NDK_NM \
         --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
         --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
     
@@ -140,10 +152,23 @@ _configure(){
 _make(){
 	echo "===============_make()==============="
 	make clean
-    make -j8
+    echo "delect *.o"
+    set -x
+    for MODULE_DIR in $FF_MODULE_DIRS
+    do
+        rm -f $MODULE_DIR/*.o
+
+        for ASM_SUB_DIR in $FF_ASSEMBLER_SUB_DIRS
+        do
+            rm -f $MODULE_DIR/$ASM_SUB_DIR/*.o
+           
+        done
+    done
+    set +x
+    make -j4
     if [ -d "${OUTPUT_PATH}" ]; then
     	echo "rm ${OUTPUT_PATH}"
-    	sleep 5
+    	sleep 2
     	rm -rf ${OUTPUT_PATH}
     fi
     make install
@@ -177,8 +202,42 @@ _link(){
 	LINK_FLG="$LINK_FLG --dynamic-linker=/system/bin/linker"
 	LINK_FLG="$LINK_FLG $TOOLCHAIN/lib/gcc/$CROSS_PREFIX/4.9.x/libgcc.a"
 
+	#$NDK_LD $LINK_FLG
 
-	$NDK_LD $LINK_FLG
+    
+    echo ""
+    echo "--------------------"
+    echo "[*] link ffmpeg"
+    echo "--------------------"
+    echo $FF_MODULE_DIRS
+
+    FF_C_OBJ_FILES=
+    FF_ASM_OBJ_FILES=
+    for MODULE_DIR in $FF_MODULE_DIRS
+    do
+        C_OBJ_FILES="$MODULE_DIR/*.o"
+        if ls $C_OBJ_FILES 1> /dev/null 2>&1; then
+            echo "link $MODULE_DIR/*.o"
+            FF_C_OBJ_FILES="$FF_C_OBJ_FILES $C_OBJ_FILES"
+        fi
+
+        for ASM_SUB_DIR in $FF_ASSEMBLER_SUB_DIRS
+        do
+            ASM_OBJ_FILES="$MODULE_DIR/$ASM_SUB_DIR/*.o"
+            if ls $ASM_OBJ_FILES 1> /dev/null 2>&1; then
+                echo "link $MODULE_DIR/$ASM_SUB_DIR/*.o"
+                FF_ASM_OBJ_FILES="$FF_ASM_OBJ_FILES $ASM_OBJ_FILES"
+            fi
+        done
+    done
+
+    #set -x
+    $NDK_CC -lm -lz -shared --sysroot=$CFLAG_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack $FF_EXTRA_LDFLAGS \
+        -Wl,-soname,libijkffmpeg.so \
+        $FF_C_OBJ_FILES \
+        $FF_ASM_OBJ_FILES \
+        $FF_DEP_LIBS \
+        -o $OUTPUT_PATH/libijkffmpeg.so
 }
 
 
@@ -211,7 +270,8 @@ esac
 
 _common
 _configure
-sleep 5
+
+#sleep 5
 _make
 _link
 

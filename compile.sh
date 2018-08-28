@@ -18,6 +18,10 @@ export SOURCE_FFMPEG="/Users/xunxun/source/ndk/ffmpeg/ffmpeg"
 export SOURCE_X264=
 export SOURCE_FDK_AAC=
 
+if test ! -d $SOURCE_FFMPEG; then
+    SOURCE_FFMPEG="/home/xunxun/Documents/ffmpeg/ffmpeg"
+fi
+
 export COM_OUTPUT_FOLD="build"
 
 echo_archs() {
