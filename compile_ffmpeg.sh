@@ -3,6 +3,7 @@
 #set -x
 
 ARCH=$1
+FF_TARGET_EXTRA=$2
 
 echo "===================="
 echo "[*] FFmpeg $1"
@@ -32,8 +33,9 @@ libavformat libavutil libswscale"
 
 OUTPUT_PATH=${SOURCE_FFMPEG}/${COM_OUTPUT_FOLD}/$ARCH
 set -x
-x264output=${SOURCE_X264}/${COM_OUTPUT_FOLD}/${ARCH}
-aacoutput=${SOURCE_FDK_AAC}/${COM_OUTPUT_FOLD}/${ARCH}
+x264output=${OUTPUT_X264}/${ARCH}
+aacoutput=${OUTPUT_FDK_AAC}/${ARCH}
+yuvoutput=${OUTPUT_YUV}/${ARCH}
 set +x
 
 armv5() {
@@ -44,17 +46,16 @@ armv5() {
 }
 
 armv7a() {
-#cortex-a8
 	FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=arm --cpu=cortex-a8 --enable-asm --enable-inline-asm" 
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-neon"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-thumb"
 
-    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS \
--march=armv7-a \
--mcpu=cortex-a8 \
--mfpu=vfpv3-d16 \
--mfloat-abi=softfp \
--mthumb"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv7-a"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -mcpu=cortex-a8"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -mfpu=vfpv3-d16"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -mfloat-abi=softfp"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -mthumb"
+
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -Wl,--fix-cortex-a8"
     FF_ASSEMBLER_SUB_DIRS="arm"
 }
@@ -112,19 +113,19 @@ _common(){
     FF_CFLAGS="$FF_CFLAGS -DANDROID -DNDEBUG"
 
     #x264
-    set -x
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libx264"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-encoder=libx264"
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${x264output}/include"
 	FF_DEP_LIBS="$FF_DEP_LIBS -L${x264output}/lib"
-    set +x
     
     #aac
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-libfdk-aac"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-encoder=libfdk_aac"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-decoder=libfdk_aac"
-
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${aacoutput}/include"
 	FF_DEP_LIBS="$FF_DEP_LIBS -L${aacoutput}/lib"
+
+    
 
     #ndk
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -I${CFLAG_SYSROOT}/usr/include"
@@ -192,34 +193,6 @@ _make(){
 
 _link(){
 	echo "===============_link()==============="
-	LINK_FLG="$LINK_FLG -rpath-link=${CFLAG_SYSROOT}/usr/lib"
-	LINK_FLG="$LINK_FLG -L${CFLAG_SYSROOT}/usr/lib"
-	LINK_FLG="$LINK_FLG -L${OUTPUT_PATH}/lib"
-
-	#LINK_FLG="$LINK_FLG -L${x264output}/lib"
-	#LINK_FLG="$LINK_FLG -L${aacoutput}/lib"
-	LINK_FLG="$LINK_FLG -soname libffmpeg.so -shared -nostdlib -Bsymbolic --whole-archive --no-undefined"
-	LINK_FLG="$LINK_FLG -o ${OUTPUT_PATH}/libffmpeg.so"
-
-	LINK_FLG="$LINK_FLG libavcodec/libavcodec.a"
-	LINK_FLG="$LINK_FLG libavdevice/libavdevice.a"
-	LINK_FLG="$LINK_FLG libavresample/libavresample.a"
-	LINK_FLG="$LINK_FLG libpostproc/libpostproc.a"
-	LINK_FLG="$LINK_FLG libavfilter/libavfilter.a"
-	LINK_FLG="$LINK_FLG libswresample/libswresample.a"
-	LINK_FLG="$LINK_FLG libavformat/libavformat.a"
-	LINK_FLG="$LINK_FLG libavutil/libavutil.a"
-	LINK_FLG="$LINK_FLG libswscale/libswscale.a"
-	#LINK_FLG="$LINK_FLG ${x264output}/lib/libx264.a"
-	#LINK_FLG="$LINK_FLG ${aacoutput}/lib/libfdk-aac.a"
-	LINK_FLG="$LINK_FLG -lc -lm -lz -ldl -llog"
-	LINK_FLG="$LINK_FLG --dynamic-linker=/system/bin/linker"
-	LINK_FLG="$LINK_FLG $TOOLCHAIN/lib/gcc/$CROSS_PREFIX/4.9.x/libgcc.a"
-
-	#$NDK_LD $LINK_FLG
-
-    
-    echo ""
     echo "--------------------"
     echo "[*] link ffmpeg"
     echo "--------------------"
@@ -248,19 +221,27 @@ _link(){
     #set -x
     $NDK_CC -lm -lz -shared --sysroot=$CFLAG_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack \
         $FF_EXTRA_LDFLAGS \
-        -Wl,-soname,libijkffmpeg.so \
+        -Wl,-soname,libffmpeg.so \
         $FF_C_OBJ_FILES \
         $FF_ASM_OBJ_FILES \
         -Wl,-Bstatic \
         $FF_DEP_LIBS \
         -lx264 -lfdk-aac \
         -Wl,-Bdynamic \
-        -o $OUTPUT_PATH/libijkffmpeg.so
+        -o $OUTPUT_PATH/libffmpeg.so
 
     if [ "$?" = "1" ];then
         exit 1
     fi
 
+}
+
+_cp2ouput(){
+    echo "===============_cp2ouput==============="
+    set -x
+    rm -rf $OUTPUT_FFMPEG/$ARCH
+    cp -r $OUTPUT_PATH $OUTPUT_FFMPEG/$ARCH
+    set +x
 }
 
 
@@ -292,13 +273,19 @@ case "$ARCH" in
 esac
 
 _common
-sleep 2
-_configure
-sleep 2
-_make
-sleep 2
-_link
-sleep 2
+#if [ "$FF_TARGET_EXTRA"="link" ]; then
+    #_link
+#else
+    _configure
+    sleep 2
+    _make
+    sleep 2
+    _link
+    sleep 2  
+#fi
+
+_cp2ouput
+
 
 # --extra-ldflags="$ADDI_LDFLAGS" \
 # OPTIMIZE_CFLAGS="-mfloat-abi=softfp -mfpu=vfp -marm -march=armv7-a "

@@ -145,7 +145,13 @@ _make(){
 	#cp -f config.h ${OUTPUT_PATH}/include/libfdk-aac/config.h
 }
 
-
+_cp2ouput(){
+    echo "===============_cp2ouput==============="
+    set -x
+    rm -rf $OUTPUT_FDK_AAC/$ARCH
+    cp -r $OUTPUT_PATH $OUTPUT_FDK_AAC/$ARCH
+    set +x
+}
 
 
 case "$ARCH" in
@@ -183,7 +189,7 @@ sleep 2
 _make
 sleep 2
 #_link
-
+_cp2ouput
 
 # --extra-ldflags="$ADDI_LDFLAGS" \
 # OPTIMIZE_CFLAGS="-mfloat-abi=softfp -mfpu=vfp -marm -march=armv7-a "

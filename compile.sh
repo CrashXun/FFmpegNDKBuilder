@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-basepath=$(cd `dirname $0`; pwd)
+export basepath=$(cd `dirname $0`; pwd)
 source environment.sh
 
 UNI_BUILD_ROOT=`pwd`
@@ -17,6 +17,17 @@ FF_ACT_ARCHS_ALL=$FF_ACT_ARCHS_64
 export SOURCE_FFMPEG="/Users/xunxun/source/ndk/ffmpeg/ffmpeg"
 export SOURCE_X264="/Users/xunxun/source/ndk/ffmpeg/x264"
 export SOURCE_FDK_AAC="/Users/xunxun/source/ndk/ffmpeg/fdk-aac/fdk-aac-0.1.5"
+export SOURCE_YUV="/Users/xunxun/source/ndk/ffmpeg/libyuv"
+
+export OUTPUT_FFMPEG=$basepath/output/ffmpeg
+export OUTPUT_X264=$basepath/output/x264
+export OUTPUT_FDK_AAC=$basepath/output/fdk-aac
+export OUTPUT_YUV=$basepath/output/yuv
+
+mkdir -p $OUTPUT_FFMPEG
+mkdir -p $OUTPUT_X264
+mkdir -p $OUTPUT_FDK_AAC
+mkdir -p $OUTPUT_YUV
 
 if test ! -d $SOURCE_FFMPEG; then
     SOURCE_FFMPEG="/home/xunxun/Documents/ffmpeg/ffmpeg"
@@ -29,6 +40,10 @@ fi
 if test ! -d $SOURCE_FDK_AAC; then
     SOURCE_FDK_AAC="/home/xunxun/Documents/ffmpeg/fdk-aac/fdk-aac-0.1.5"
     #SOURCE_FDK_AAC="/home/xunxun/Documents/ffmpeg/fdk-aac-0.1.6"
+fi
+
+if test ! -d $SOURCE_YUV; then
+    SOURCE_YUV="/home/xunxun/Documents/ffmpeg/libyuv"
 fi
 
 export COM_OUTPUT_FOLD="build"
@@ -57,21 +72,28 @@ startCompile() {
     archparam=$1
     source toolchain.sh $archparam
 
-    #************x264************
-    cd $SOURCE_X264
-    sh ${basepath}/compile_x264.sh $archparam
+    if [ "$FF_TARGET_EXTRA"="link" ]; then
+        cd $SOURCE_FFMPEG
+        source ${basepath}/ffmpeg_common_param.sh $archparam
+        sh ${basepath}/compile_ffmpeg.sh $archparam $FF_TARGET_EXTRA
+    else
+        #************x264************
+        cd $SOURCE_X264
+        sh ${basepath}/compile_x264.sh $archparam
 
-    #************fdk-aac************
-    cd $SOURCE_FDK_AAC
-    sh ${basepath}/compile_fdk-aac.sh $archparam
+        #************fdk-aac************
+        cd $SOURCE_FDK_AAC
+        sh ${basepath}/compile_fdk-aac.sh $archparam
 
-    #************ffmpeg************
-    cd $SOURCE_FFMPEG
-    source ${basepath}/ffmpeg_common_param.sh $archparam
-    sh ${basepath}/compile_ffmpeg.sh $archparam
-    
-    
-   
+        #************ffmpeg************
+        cd $SOURCE_FFMPEG
+        source ${basepath}/ffmpeg_common_param.sh $archparam
+        sh ${basepath}/compile_ffmpeg.sh $archparam
+        
+        #************yuv************
+        cd $SOURCE_YUV
+        sh ${basepath}/compile_yuv.sh $archparam
+    fi
 }
 
 check_var() {
@@ -115,6 +137,8 @@ case "$FF_TARGET" in
         done
     ;;
     clean)
+        #call subscript clean
+#...
         echo_archs FF_ACT_ARCHS_64
         rm -rf ./build/ffmpeg-*
     ;;
@@ -129,50 +153,4 @@ esac
 
 exit 0
 
-
-createSo(){
-	$TOOLCHAIN/bin/arm-linux-androideabi-ld \
--rpath-link=$PLATFORM/usr/lib \
--L$PLATFORM/usr/lib \
--L$PREFIX/lib \
--L$X264_LIB \
--soname libffmpeg.so -shared -nostdlib -Bsymbolic --whole-archive --no-undefined -o \
-$PREFIX/libffmpeg.so \
-libavcodec/libavcodec.a \
-libavdevice/libavdevice.a \
-libavresample/libavresample.a \
-libpostproc/libpostproc.a \
-libavfilter/libavfilter.a \
-libswresample/libswresample.a \
-libavformat/libavformat.a \
-libavutil/libavutil.a \
-libswscale/libswscale.a \
-$X264_LIB/libx264.a \
-$fdkaac_LIB/libfdk-aac.a \
--lc -lm -lz -ldl -llog --dynamic-linker=/system/bin/linker \
-$TOOLCHAIN/lib/gcc/arm-linux-androideabi/4.9.x/libgcc.a
-}
-
-export NDK=/home/xunxun/devtool/android-ndk-r15c
-export TOOLCHAIN=$NDK/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64
-export PLATFORM=$NDK/platforms/android-16/arch-arm
-
-#libx264编译产物位置，ffmpeg编译需要依赖
-x264_lib=/home/xunxun/dev/x264_build4android/arm
-X264_INCLUDE=${x264_lib}/include
-X264_LIB=${x264_lib}/lib
-
-fdkaac_lib=/home/xunxun/Documents/ffmpeg/fdk-aac/fdk-aac-0.1.5/android/arm
-fdkaac_INCLUDE=${fdkaac_lib}/include
-fdkaac_LIB=${fdkaac_lib}/lib
-
-# arm v7vfp
-
-
-
-echo "build finish"
-sleep 5
-echo "createSo"
-#链接静态库为一个动态库
-createSo
 

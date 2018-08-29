@@ -175,7 +175,13 @@ _link(){
         $FF_DEP_LIBS \
         -o $OUTPUT_PATH/libijkffmpeg.so
 }
-
+_cp2ouput(){
+    echo "===============_cp2ouput==============="
+    set -x
+    rm -rf $OUTPUT_X264/$ARCH
+    cp -r $OUTPUT_PATH $OUTPUT_X264/$ARCH
+    set +x
+}
 
 case "$ARCH" in
     armv5)
@@ -212,7 +218,7 @@ sleep 2
 _make
 sleep 2
 #_link
-
+_cp2ouput
 
 # --extra-ldflags="$ADDI_LDFLAGS" \
 # OPTIMIZE_CFLAGS="-mfloat-abi=softfp -mfpu=vfp -marm -march=armv7-a "

@@ -19,8 +19,10 @@ elif [ -z "$FF_NDK" ]; then
     exit 1
 fi
 
-ANDROID_VER_32=android-9
+set -x
+ANDROID_VER_32=android-14
 ANDROID_VER_64=android-21
+set +x
 
 export GCC_VER=4.9
 export GCC_64_VER=4.9
