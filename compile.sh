@@ -72,7 +72,7 @@ startCompile() {
     archparam=$1
     source toolchain.sh $archparam
 
-    if [ "$FF_TARGET_EXTRA"="link" ]; then
+    if [ "$FF_TARGET_EXTRA" = "link" ]; then
         cd $SOURCE_FFMPEG
         source ${basepath}/ffmpeg_common_param.sh $archparam
         sh ${basepath}/compile_ffmpeg.sh $archparam $FF_TARGET_EXTRA
@@ -139,8 +139,19 @@ case "$FF_TARGET" in
     clean)
         #call subscript clean
 #...
+        echo 'clean all'
         echo_archs FF_ACT_ARCHS_64
-        rm -rf ./build/ffmpeg-*
+        set -x
+        rm -rf ${SOURCE_FFMPEG}/build/*
+        rm -rf ${SOURCE_X264}/build/*
+        rm -rf ${SOURCE_FDK_AAC}/build/*
+        rm -rf ${SOURCE_YUV}/obj
+        rm -rf ${OUTPUT_FFMPEG}/*
+        rm -rf ${OUTPUT_X264}/*
+        rm -rf ${OUTPUT_FDK_AAC}/*
+        rm -rf ${OUTPUT_YUV}/*
+        set +x
+
     ;;
     check)
         echo_archs FF_ACT_ARCHS_ALL
